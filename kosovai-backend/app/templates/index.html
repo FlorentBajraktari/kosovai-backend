@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="sq">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KosovAI Chatbot</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css">
+    <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
+    <style>
+        body { background-color: #f8f9fa; display: flex; height: 100vh; flex-direction: column; }
+        .main-container { display: flex; flex-grow: 1; }
+        .sidebar { 
+            width: 280px; 
+            background: #343a40; 
+            color: white; 
+            padding: 20px; 
+            overflow-y: auto; 
+            position: fixed; 
+            left: 0; 
+            top: 0; 
+            bottom: 0; 
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            transition: all 0.3s;
+        }
+        .sidebar.hidden { width: 0; padding: 0; overflow: hidden; }
+        .toggle-btn { position: absolute; left: 280px; top: 20px; cursor: pointer; }
+        .chat-container { flex-grow: 1; margin-left: 300px; padding: 20px; display: flex; flex-direction: column; }
+        .chat-box { flex-grow: 1; overflow-y: auto; background: white; padding: 15px; border-radius: 5px; border: 1px solid #ddd; height: 400px; }
+        .loading { display: none; font-style: italic; color: gray; }
+        .history-item { cursor: pointer; padding: 5px; border-bottom: 1px solid #555; }
+        .history-item:hover { background: #495057; }
+        .search-bar { margin-bottom: 10px; }
+        .developer-info { text-align: center; color: lightgray; padding-top: 10px; font-size: 14px; }
+        .message.user { text-align: right; background-color: #007bff; color: white; padding: 8px; border-radius: 10px; margin: 5px 0; display: inline-block; }
+        .message.bot { text-align: left; background-color: #e9ecef; color: black; padding: 8px; border-radius: 10px; margin: 5px 0; display: inline-block; }
+        .input-container { display: flex; padding-top: 10px; }
+        .input-container input { flex-grow: 1; }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Sidebar -->
+        <div class="sidebar" id="sidebar">
+            <h3>Explore KosovAI</h3>
+            <input type="text" id="search-history" class="form-control search-bar" placeholder="Kërko biseda...">
+            <button class="btn btn-light w-100 mb-3" onclick="newConversation()">New Conversation</button>
+            <div id="chat-history"></div>
+            <div class="developer-info">Developed by Florent.B</div>
+        </div>
+        <button class="btn btn-secondary toggle-btn" onclick="toggleSidebar()">☰</button>
+        
+        <!-- Chat Container -->
+        <div class="chat-container">
+            <h2 class="text-center">KosovAI Chatbot</h2>
+            <div id="chat-box" class="chat-box border mb-3"></div>
+            <div class="loading text-center">Duke u përgjigjur...</div>
+            <div class="input-container">
+                <input type="text" id="user-input" class="form-control" placeholder="Shkruaj diçka..." onkeypress="handleKeyPress(event)">
+                <button onclick="sendMessage()" class="btn btn-primary ms-2">Dërgo</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let chatHistory = JSON.parse(localStorage.getItem("chatHistory")) || [];
+        const historyContainer = document.getElementById("chat-history");
+        
+        function toggleSidebar() {
+            const sidebar = document.getElementById("sidebar");
+            sidebar.classList.toggle("hidden");
+        }
+        
+        async function sendMessage() {
+            const inputField = document.getElementById("user-input");
+            const chatBox = document.getElementById("chat-box");
+            const loadingText = document.querySelector(".loading");
+            const userMessage = inputField.value.trim();
+            if (!userMessage) return;
+            
+            chatBox.innerHTML += `<div class='message user'>${userMessage}</div>`;
+            inputField.value = "";
+            loadingText.style.display = "block";
+            
+            try {
+                const response = await fetch("/chat", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ message: userMessage })
+                });
+                
+                const data = await response.json();
+                if (response.ok) {
+                    const aiResponse = data.response;
+                    chatBox.innerHTML += `<div class='message bot'>${aiResponse}</div>`;
+                    chatHistory.push({ user: userMessage, bot: aiResponse });
+                    localStorage.setItem("chatHistory", JSON.stringify(chatHistory));
+                    updateHistory();
+                } else {
+                    chatBox.innerHTML += `<div style="color: red;"><strong>Gabim:</strong> ${data.error || "Gabim i panjohur!"}</div>`;
+                }
+            } catch (error) {
+                chatBox.innerHTML += `<div style="color: red;"><strong>Gabim:</strong> Nuk u lidh me serverin!</div>`;
+            } finally {
+                loadingText.style.display = "none";
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        }
+        
+        function handleKeyPress(event) {
+            if (event.key === "Enter") {
+                sendMessage();
+            }
+        }
+        
+        function newConversation() {
+            document.getElementById("chat-box").innerHTML = "";
+            chatHistory = [];
+            localStorage.removeItem("chatHistory");
+        }
+        
+        function updateHistory() {
+            historyContainer.innerHTML = "";
+            chatHistory.forEach((chat, index) => {
+                const div = document.createElement("div");
+                div.className = "history-item";
+                div.innerHTML = `<strong>Biseda ${index + 1}</strong>: ${chat.user.substring(0, 20)}...`;
+                div.onclick = () => loadChat(index);
+                historyContainer.appendChild(div);
+            });
+        }
+        
+        updateHistory();
+    </script>
+</body>
+</html>
